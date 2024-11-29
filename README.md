@@ -1,59 +1,192 @@
-# æpp boilerplate ReactJS frontend
+# SkillChain: AI-Powered Decentralized Learning & Certification Platform
 
-This boilerplate allows everyone to easy start when building an æpp with ReactJS on top of the æternity ecosystem.
-This boilerplate detects any Aeternity compatible wallets installed, if yes then connects to it.
-Provides a variable `aeSdk` which could be used to interact with the Wallet and the Aeternity Blockchain.
+## Overview
+SkillChain is a decentralized application that combines AI-powered assessment, blockchain certification, and peer-to-peer learning. It allows users to:
 
-## Get started
+1. Learn new skills through AI-curated content
+2. Verify their skills through AI-powered assessments
+3. Earn on-chain skill certificates as NFTs
+4. Monetize their expertise by teaching others
+5. Build reputation through verifiable credentials
 
-Clone repo via git or use the template button above.
+## Technical Architecture
 
-Install the dependencies
-
-```bash
-npm install
+```mermaid
+graph TD
+    A[Web Frontend - Vue.js] --> B[Elixir Backend API]
+    B --> C[æternity Blockchain]
+    B --> D[AI Assessment Engine]
+    C --> E[Smart Contracts]
+    D --> F[OpenAI GPT-4]
 ```
 
-For development purposes (hot-reloading)
+## Key Features
 
-```bash
-npm start
-# npm run start:testnet
-# npm run start:mainnet
+1. AI-Powered Skill Assessment
+- Uses GPT-4 to evaluate submissions
+- Provides detailed feedback and scoring
+- Adapts assessment difficulty based on skill level
+
+2. Blockchain Certification
+- Issues verifiable certificates as NFTs
+- Immutable proof of skills
+- Transferable credentials
+
+3. P2P Learning Marketplace
+- Connect learners with experts
+- Tokenized incentives for teaching
+- Reputation system for instructors
+
+4. Automated Course Generation
+- AI creates personalized learning paths
+- Dynamic content curation
+- Progress tracking
+
+## Innovation & Impact
+
+1. Solves the problem of skill verification in remote work
+2. Creates new earning opportunities through P2P learning
+3. Reduces certification costs and increases accessibility
+4. Provides transparent and verifiable credentials
+5. Leverages AI for objective skill assessment
+
+This dApp combines the strengths of æternity (smart contracts, state channels), AI (assessment, personalization), and Erlang/Elixir (scalable backend) to create a valuable platform for decentralized learning and certification.
+
+### Smart Contracts
+
+```sophia:contracts/SkillChain.aes
+contract SkillChain =
+  
+  record state = {
+    certificates : map(address, map(string, certificate)),
+    instructors : map(address, instructor),
+    courses : map(string, course)
+  }
+  
+  record certificate = {
+    skill_name : string,
+    score : int,
+    timestamp : int,
+    issuer : address,
+    metadata_url : string
+  }
+  
+  record instructor = {
+    reputation : int,
+    earnings : int,
+    students : list(address)
+  }
+  
+  record course = {
+    name : string,
+    instructor : address,
+    price : int,
+    enrolled : list(address)
+  }
+
+  // Initialize contract
+  stateful entrypoint init() = {
+    certificates = {},
+    instructors = {},
+    courses = {}
+  }
+
+  // Issue new skill certificate
+  stateful entrypoint issue_certificate(student: address, skill: string, score: int, metadata: string) =
+    require(Call.caller == student || Map.member(Call.caller, state.instructors), "Unauthorized")
+    let cert = {
+      skill_name = skill,
+      score = score,
+      timestamp = Chain.timestamp,
+      issuer = Call.caller,
+      metadata_url = metadata
+    }
+    put(state{certificates[student][skill] = cert})
+
+  // Register as instructor
+  stateful entrypoint register_instructor() =
+    require(!Map.member(Call.caller, state.instructors), "Already registered")
+    let instructor = {
+      reputation = 0,
+      earnings = 0,
+      students = []
+    }
+    put(state{instructors[Call.caller] = instructor})
+
+  // Create new course
+  stateful entrypoint create_course(name: string, price: int) =
+    require(Map.member(Call.caller, state.instructors), "Not an instructor")
+    let course = {
+      name = name,
+      instructor = Call.caller,
+      price = price,
+      enrolled = []
+    }
+    put(state{courses[name] = course})
 ```
 
-To build the bundle for production
+### Elixir Backend
 
-```bash
-npm run build
+```elixir:lib/skill_chain/application.ex
+defmodule SkillChain.Application do
+  use Application
+
+  def start(_type, _args) do
+    children = [
+      SkillChain.Repo,
+      SkillChainWeb.Endpoint,
+      {SkillChain.AI.AssessmentEngine, []},
+      {SkillChain.Blockchain.ContractManager, []}
+    ]
+
+    opts = [strategy: :one_for_one, name: SkillChain.Supervisor]
+    Supervisor.start_link(children, opts)
+  end
+end
 ```
 
-For running the integration tests
+```elixir:lib/skill_chain/ai/assessment_engine.ex
+defmodule SkillChain.AI.AssessmentEngine do
+  use GenServer
+  
+  def start_link(_) do
+    GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
+  end
 
-```bash
-npm test
+  def init(state) do
+    {:ok, state}
+  end
+
+  def handle_call({:assess_skill, skill, submission}, _from, state) do
+    # Connect to OpenAI API
+    result = OpenAI.complete(%{
+      model: "gpt-4",
+      prompt: generate_assessment_prompt(skill, submission),
+      max_tokens: 1000
+    })
+
+    case result do
+      {:ok, assessment} ->
+        {:reply, process_assessment(assessment), state}
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
+    end
+  end
+
+  defp generate_assessment_prompt(skill, submission) do
+    """
+    Assess the following submission for #{skill} expertise level.
+    Consider:
+    1. Technical accuracy
+    2. Problem-solving approach
+    3. Best practices
+    4. Code quality (if applicable)
+    
+    Submission:
+    #{submission}
+    
+    Provide a score from 0-100 and detailed feedback.
+    """
+  end
+end
 ```
-
-## Links
-
-1. [Working with Contracts guide](https://docs.aeternity.com/aepp-sdk-js/v13.0.1/guides/contracts/)
-2. [Vue AEPP example](https://github.com/aeternity/aepp-sdk-js/tree/develop/examples/browser)
-
-## Main Features
-
-### Custom GitHub Action
-
-We engineered this GitHub Action config to be as versatile as possible while being transparent to the developer. There are no hidden config files and a minimal set of presets where necessary.
-
-`build_and_deploy.yml`: This Action configuration file named *æpp CI/CD* is used to build and deploy the æpp boilerplate. It represents a GitHub Action file that performs actions on push changes to branches. The action config performs two main jobs of building and deployment.
-The build job installs the required NPM dependencies using three recent node versions then runs test suite and executes the ```npm run build``` command to prepare the production-ready files for deployment.
-The deploy job continues the action workflow to deploy the already prepared production-ready files using gh-pages. This deploy process creates/updates the *gh-pages* branch that previews the æpp-boilerplate via the provided GitHub Repo Page Link.
-
-### aepp-sdk-js integration
-
-This dependency is imported and should work out of the box with this implementation. An initialized client is provided by the `useAeternitySDK.ts` file as used in the `App.js` file to discover a connected wallet.
-
-### Easy wallet discovery
-
-Since we aim to make this boilerplate as universally connective as possible, we implemented an easy wallet discovery feature to get the connected Superhero wallet address and AE balance. This process started from the `useAeternitySDK.ts` file that uses the imported `@aeternity/aepp-sdk` dependency. That file exposes SDK instance the same as method to connect to wallet, reactive variables to get current address and network id.
-The `useAeternitySDK.ts` module is then used in the `App.js` file to get the connected wallet address and initialized client that provides the AE balance for the connected address.
