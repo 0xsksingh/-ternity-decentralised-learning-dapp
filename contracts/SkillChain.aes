@@ -1,0 +1,68 @@
+contract SkillChain =
+  
+  record state = {
+    certificates : map(address, map(string, certificate)),
+    instructors : map(address, instructor),
+    courses : map(string, course)
+  }
+  
+  record certificate = {
+    skill_name : string,
+    score : int,
+    timestamp : int,
+    issuer : address,
+    metadata_url : string
+  }
+  
+  record instructor = {
+    reputation : int,
+    earnings : int,
+    students : list(address)
+  }
+  
+  record course = {
+    name : string,
+    instructor : address,
+    price : int,
+    enrolled : list(address)
+  }
+
+  // Initialize contract
+  stateful entrypoint init() = {
+    certificates = {},
+    instructors = {},
+    courses = {}
+  }
+
+  // Issue new skill certificate
+  stateful entrypoint issue_certificate(student: address, skill: string, score: int, metadata: string) =
+    require(Call.caller == student || Map.member(Call.caller, state.instructors), "Unauthorized")
+    let cert = {
+      skill_name = skill,
+      score = score,
+      timestamp = Chain.timestamp,
+      issuer = Call.caller,
+      metadata_url = metadata
+    }
+    put(state{certificates[student][skill] = cert})
+
+  // Register as instructor
+  stateful entrypoint register_instructor() =
+    require(!Map.member(Call.caller, state.instructors), "Already registered")
+    let instructor = {
+      reputation = 0,
+      earnings = 0,
+      students = []
+    }
+    put(state{instructors[Call.caller] = instructor})
+
+  // Create new course
+  stateful entrypoint create_course(name: string, price: int) =
+    require(Map.member(Call.caller, state.instructors), "Not an instructor")
+    let course = {
+      name = name,
+      instructor = Call.caller,
+      price = price,
+      enrolled = []
+    }
+    put(state{courses[name] = course}) 
