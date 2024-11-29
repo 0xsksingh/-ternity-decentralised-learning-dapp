@@ -1,0 +1,57 @@
+name: æpp CI/CD
+
+on: [push]
+
+jobs:
+  build:
+    name: Build æpp
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [16.x, 18.x, 20.x]
+    
+    steps:
+    - name: Checkout æpp code
+      uses: actions/checkout@v3
+    
+    - name: Install Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+    
+    - name: Install NPM dependencies
+      run: npm ci
+    
+    - name: Run tests
+      run: npm test
+    
+    - name: Build production-ready files
+      env:
+        PUBLIC_URL: /aepp-boilerplate-react/
+      run: npm run build
+
+    - name: Upload production-ready build files
+      uses: actions/upload-artifact@v3
+      with:
+        name: production-files
+        path: ./build
+  
+  deploy:
+    name: Deploy æpp
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Download production-ready build files
+      uses: actions/download-artifact@v3
+      with:
+        name: production-files
+        path: ./build
+
+    - name: Deploy to gh-pages
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./build
